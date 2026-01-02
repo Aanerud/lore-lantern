@@ -1,0 +1,145 @@
+# LLM Model Configuration for Lore Lantern
+# ==========================================
+#
+# Hierarchy (highest priority first):
+#   1. Environment variable: TEST_<AGENT_NAME>_MODEL (e.g., TEST_STRUCTURE_MODEL)
+#   2. Environment variable: TEST_<GROUP_NAME>_MODEL (e.g., TEST_ROUNDTABLE_MODEL)
+#   3. Agent-specific model (if set in this file)
+#   4. Group model (if agent is in a group with model set)
+#   5. Default model
+#
+# Usage Examples:
+#   TEST_ROUNDTABLE_MODEL="gemini-3-flash-preview" python -m src.main
+#   TEST_NARRATIVE_MODEL="claude-sonnet-4-5-20250929" python tests/e2e_test.py
+#   TEST_LINE_EDITOR_MODEL="gpt-4o" python -m src.main
+
+default:
+  model: "azure/model-router"
+  temperature: 0.7
+  max_tokens: 8000
+  timeout: 900
+
+# Agent Groups (for batch overrides)
+# Set model: to override all agents in the group
+groups:
+  roundtable:
+    description: "Round Table reviewers - 6 agents that review each chapter"
+    members:
+      - structure      # Guillermo - Story Architect
+      - factcheck      # Bill - Fact Checker
+      - character      # Clarissa - Character Psychologist
+      - line_editor    # Benjamin - Prose Editor
+      - continuity     # Continuity - Story Consistency
+      - tension        # Stephen - Narrative Tension
+    model: null  # Set to override all reviewers, e.g., "gemini-3-flash-preview"
+
+  writers:
+    description: "Story generation agents"
+    members:
+      - narrative      # Africanfuturist - Story Writer
+      - dialogue       # Hanan - Companion Dialogue
+    model: null
+
+  post:
+    description: "Post-processing agents"
+    members:
+      - voice_director  # Jim Dale - Voice Direction
+    model: null
+
+  refiners:
+    description: "Language-specific text refinement agents"
+    members:
+      - language_refiner  # Borealis - Norwegian refinement
+    model: null
+
+# Per-Agent Configuration
+# Each agent has: display_name, description, model, temperature, max_tokens, timeout
+# Set model: null to use group/default, or specify a model to override
+agents:
+  # === ROUND TABLE REVIEWERS ===
+
+  structure:
+    display_name: "Guillermo"
+    description: "Story Architect & World-Builder (Guillermo del Toro persona)"
+    model: "gemini-3-pro-preview"  # 2x faster (51s) - great for structure planning
+    temperature: 0.75
+    max_tokens: 16384
+    timeout: 1800
+
+  factcheck:
+    display_name: "Bill"
+    description: "Fact-Check Reviewer (Bill Bryson persona)"
+    model: "gpt-5.2"  # Fast accuracy - excellent fact checking
+    temperature: 0.25
+    max_tokens: 4000
+    timeout: 1800
+
+  character:
+    display_name: "Clarissa"
+    description: "Character Reviewer - Jungian Depth (Clarissa Pinkola Estés persona)"
+    model: "claude-opus-4-5-20251101"  # Jungian depth, D&D progression - rich creative output
+    temperature: 0.65
+    max_tokens: 16000
+    timeout: 1800
+
+  line_editor:
+    display_name: "Benjamin"
+    description: "Prose Quality Reviewer (Benjamin Dreyer persona)"
+    model: "claude-sonnet-4-5-20250929"  # Refinement - Sonnet handles style well
+    temperature: 0.4
+    max_tokens: 8000
+    timeout: 900
+
+  continuity:
+    display_name: "Continuity"
+    description: "Story Continuity Reviewer"
+    model: "claude-sonnet-4-5-20250929"  # Analysis task - Sonnet is plenty
+    temperature: 0.3
+    max_tokens: 8000
+    timeout: 900
+
+  tension:
+    display_name: "Stephen"
+    description: "Narrative Tension Reviewer (Stephen King persona)"
+    model: "claude-sonnet-4-5-20250929"  # Better pacing analysis
+    temperature: 0.4
+    max_tokens: 8000
+    timeout: 900
+
+  # === WRITERS ===
+
+  narrative:
+    display_name: "Africanfuturist"
+    description: "Story Writer (Nnedi Okofor persona)"
+    model: "claude-opus-4-5-20251101"  # Critical - prose quality is the product
+    temperature: 0.85
+    max_tokens: 16384
+    timeout: 1800
+
+  dialogue:
+    display_name: "Hanan"
+    description: "Companion Dialogue Agent - Enthusiastic Teacher"
+    model: "gpt-4o-mini"  # Realtime speed via Foundry
+    temperature: 0.8
+    max_tokens: 4096
+    timeout: 300
+
+  # === POST-PROCESSING ===
+
+  voice_director:
+    display_name: "Jim Dale"
+    description: "Voice Direction Agent - Audiobook Narration"
+    model: "gemini-3-flash-preview"  # Fast markup
+    temperature: 0.55
+    max_tokens: 16000
+    timeout: 900
+
+  # === LANGUAGE REFINERS ===
+
+  language_refiner:
+    display_name: "Borealis"
+    description: "Norwegian language refinement (NB AI Lab Borealis-4B model on Ollama)"
+    model: "ollama/hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:BF16"  # Local Ollama server
+    temperature: 0.3  # Low for consistency - preserve structure
+    max_tokens: 8000
+    timeout: 300

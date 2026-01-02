@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lore Lantern - Debug Studio</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏮</text></svg>">
+    <link rel="stylesheet" href="/static/css/style.css?v=6.13.0">
+</head>
+<body>
+    <div class="debug-studio">
+        <header class="studio-header">
+            <h1>🏮 Lore Lantern <span class="debug-badge">Debug Studio</span></h1>
+        </header>
+
+        <div class="split-container">
+            <!-- ==================== LEFT PANEL: User App ==================== -->
+            <div class="user-panel">
+                <!-- Profile Selection -->
+                <section class="panel profile-panel compact">
+                    <div class="profile-row">
+                        <div class="profile-select-group">
+                            <label>Household</label>
+                            <select id="parent-select">
+                                <option value="">Select household...</option>
+                            </select>
+                            <button id="create-parent-btn" class="icon-btn" title="New Household">+</button>
+                        </div>
+                        <span class="profile-badge" id="parent-language-badge">🌍</span>
+                    </div>
+
+                    <!-- Create Household Form (hidden) -->
+                    <div class="create-form hidden" id="create-parent-form">
+                        <input type="text" id="new-parent-name" placeholder="Family name..." />
+                        <select id="new-parent-language">
+                            <option value="en">🇬🇧 EN</option>
+                            <option value="no">🇳🇴 NO</option>
+                            <option value="es">🇪🇸 ES</option>
+                        </select>
+                        <button id="save-parent-btn" class="primary-btn small">Create</button>
+                        <button id="cancel-parent-btn" class="text-btn">Cancel</button>
+                    </div>
+
+                    <!-- Children Row -->
+                    <div class="children-row">
+                        <div class="children-grid compact" id="children-grid">
+                            <span class="placeholder">Select household...</span>
+                        </div>
+                        <button id="create-child-btn" class="icon-btn" title="New User" disabled>+</button>
+                        <button id="restart-session-btn" class="icon-btn restart-btn" title="Restart Session">🔄</button>
+                    </div>
+
+                    <!-- Create User Form (hidden) -->
+                    <div class="create-form hidden" id="create-child-form">
+                        <input type="text" id="new-user-name" placeholder="Name" />
+                        <input type="number" id="new-user-age" placeholder="Age" min="1" max="120" />
+                        <button id="save-child-btn" class="primary-btn small">Create</button>
+                        <button id="cancel-child-btn" class="text-btn">Cancel</button>
+                    </div>
+
+                    <!-- Active Profile -->
+                    <div class="active-profile hidden" id="active-profile-summary">
+                        <span id="active-avatar">👧</span>
+                        <span id="active-name">--</span>
+                        <span id="active-age" class="age-badge">--</span>
+                    </div>
+                </section>
+
+                <!-- Story Input -->
+                <section class="panel story-input-panel hidden" id="story-creation-panel">
+                    <div class="input-row">
+                        <input type="text" id="story-input" placeholder="Tell me about Vikings, continue my story..." />
+                        <button id="send-button" class="primary-btn">Start</button>
+                    </div>
+                    <span class="mic-status" id="mic-status"></span>
+                </section>
+
+                <!-- Chapter Reader (shows when story is active) -->
+                <section class="panel reader-panel hidden" id="chapters-panel">
+                    <div class="reader-header">
+                        <div class="chapter-tabs" id="chapter-tabs"></div>
+                        <button id="refine-norwegian-btn" class="icon-btn hidden" title="Refine Norwegian (Borealis)">🇳🇴</button>
+                        <button id="compare-refinement-btn" class="icon-btn hidden" title="Compare Original vs Refined">🔍</button>
+                        <button id="generate-all-tts-btn" class="icon-btn" title="Generate All Audio">🔊</button>
+                    </div>
+                    <div class="chapter-content" id="chapter-content-area">
+                        <div class="chapter-placeholder">Select a chapter...</div>
+                    </div>
+                </section>
+
+                <!-- Chat Section -->
+                <section class="panel chat-panel">
+                    <div class="chat-header">
+                        <span>💬 Chat</span>
+                        <span class="discussion-indicator hidden" id="discussion-indicator">Post-Chapter</span>
+                    </div>
+                    <div class="chat-history" id="chat-history">
+                        <div class="chat-welcome">Select a profile to start...</div>
+                    </div>
+                    <div class="chat-input-container hidden" id="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Type your message..." />
+                        <button id="send-chat-btn" class="primary-btn">Send</button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- ==================== RIGHT PANEL: Agent Observatory ==================== -->
+            <div class="observatory-panel">
+                <!-- Session ID Header -->
+                <div class="session-header">
+                    <span class="session-label">Session:</span>
+                    <span class="session-id" id="session-id-display">--</span>
+                </div>
+
+                <!-- Pipeline Status -->
+                <section class="panel pipeline-panel">
+                    <h3>Pipeline</h3>
+                    <div class="pipeline-stages" id="pipeline-stages">
+                        <div class="stage" data-stage="structure">
+                            <span class="stage-icon">○</span>
+                            <span class="stage-label">Structure</span>
+                        </div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage" data-stage="characters">
+                            <span class="stage-icon">○</span>
+                            <span class="stage-label">Characters</span>
+                        </div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage" data-stage="chapters">
+                            <span class="stage-icon">○</span>
+                            <span class="stage-label">Chapters</span>
+                        </div>
+                        <div class="stage-arrow">→</div>
+                        <div class="stage" data-stage="complete">
+                            <span class="stage-icon">○</span>
+                            <span class="stage-label">Complete</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Active Agents -->
+                <section class="panel agents-panel">
+                    <h3>Agents</h3>
+                    <div class="agents-columns">
+                        <div class="agent-group">
+                            <span class="agent-group-label">Production</span>
+                            <div class="agents-list" id="agents-list">
+                                <div class="agent-item idle" data-agent="StructureAgent" title="Structure Agent">○ 📐 Structure</div>
+                                <div class="agent-item idle" data-agent="CharacterAgent" title="Character Agent">○ 🎭 Character</div>
+                                <div class="agent-item idle" data-agent="NarrativeAgent" title="Narrative Agent">○ ✍️ Narrative</div>
+                                <div class="agent-item idle" data-agent="VoiceDirectorAgent" title="Voice Director">○ 🎙️ Voice</div>
+                                <div class="agent-item idle" data-agent="CompanionAgent" title="Companion Agent">○ 🤝 Companion</div>
+                                <div class="agent-item idle" data-agent="LineEditorAgent" title="Polish Pass">○ 💅 Polish</div>
+                            </div>
+                        </div>
+                        <div class="agent-group">
+                            <span class="agent-group-label">Round Table</span>
+                            <div class="agents-list" id="roundtable-agents-list">
+                                <div class="agent-item idle" data-agent="Guillermo" title="Guillermo del Toro - Structure">○ 🎬 Guillermo</div>
+                                <div class="agent-item idle" data-agent="Bill" title="Bill Bryson - Facts">○ 🔬 Bill</div>
+                                <div class="agent-item idle" data-agent="Clarissa" title="Clarissa Pinkola Estés - Characters">○ 📚 Clarissa</div>
+                                <div class="agent-item idle" data-agent="Benjamin" title="Benjamin Dreyer - Prose">○ ✏️ Benjamin</div>
+                                <div class="agent-item idle" data-agent="Continuity" title="Continuity Editor - Plot Threads">○ 🔗 Continuity</div>
+                                <div class="agent-item idle" data-agent="Stephen" title="Stephen King - Tension">○ ⚡ Stephen</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chapter Timeline -->
+                <section class="panel chapter-timeline-panel">
+                    <h3>Chapter Timeline</h3>
+                    <div class="chapter-timeline" id="chapter-timeline">
+                        <div class="timeline-empty">Waiting for story generation...</div>
+                    </div>
+                </section>
+
+                <!-- Round Table Timeline -->
+                <section class="panel roundtable-panel">
+                    <h3>Round Table</h3>
+                    <div class="roundtable-timeline" id="roundtable-timeline">
+                        <div class="rt-empty">No review in progress</div>
+                    </div>
+                </section>
+
+                <!-- Event Log -->
+                <section class="panel eventlog-panel">
+                    <div class="eventlog-header">
+                        <h3>Event Log <span class="event-count" id="event-count">0</span></h3>
+                        <button id="clear-eventlog-btn" class="icon-btn small" title="Clear Event Log">🗑️</button>
+                    </div>
+                    <div class="event-log" id="event-log">
+                        <div class="event-empty">Waiting for events...</div>
+                    </div>
+                </section>
+
+                <!-- Story Details (collapsible) -->
+                <details class="panel story-details-panel hidden" id="story-details-panel" open>
+                    <summary>📚 Story Info</summary>
+
+                    <!-- Overview -->
+                    <div class="story-section">
+                        <div class="story-title-row">
+                            <span class="story-title" id="info-title">--</span>
+                            <span class="status-badge" id="info-status">--</span>
+                        </div>
+                        <div class="story-meta-row">
+                            <span class="meta-tag" id="info-theme">--</span>
+                            <span class="meta-tag" id="info-method">--</span>
+                            <span class="meta-tag" id="info-reading-time">--</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="info-progress" style="width: 0%"></div>
+                            <span class="progress-label" id="info-progress-label">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Educational Goals -->
+                    <details class="story-subsection" open>
+                        <summary>🎓 Learning Goals</summary>
+                        <div class="goals-list" id="info-goals"></div>
+                    </details>
+
+                    <!-- Characters -->
+                    <details class="story-subsection" open>
+                        <summary>🎭 Characters</summary>
+                        <div class="characters-grid" id="characters-grid"></div>
+                    </details>
+
+                    <!-- Plot Threads -->
+                    <details class="story-subsection">
+                        <summary>🔗 Plot Threads</summary>
+                        <div class="plot-threads-list" id="info-plot-threads"></div>
+                    </details>
+
+                    <!-- Chapters -->
+                    <details class="story-subsection">
+                        <summary>📖 Chapters</summary>
+                        <div class="chapters-outline" id="info-chapters"></div>
+                    </details>
+
+                    <!-- Raw Data (Debug) -->
+                    <details class="story-subsection">
+                        <summary>🔍 Raw JSON</summary>
+                        <pre class="raw-json" id="info-raw-json"></pre>
+                    </details>
+                </details>
+
+                <!-- Debug Controls (Hidden - elements kept for JS compatibility) -->
+                <div style="display:none">
+                    <span id="ws-status">--</span>
+                    <span id="api-status">--</span>
+                    <button id="test-api-btn"></button>
+                    <button id="clear-btn"></button>
+                    <button id="stop-speech-btn"></button>
+                    <button id="mic-button"></button>
+                    <pre id="raw-json">No data</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden elements for compatibility -->
+        <span id="sr-support" style="display:none"></span>
+        <span id="ss-support" style="display:none"></span>
+        <button id="refresh-story-btn" style="display:none"></button>
+        <span id="playback-phase" style="display:none"></span>
+    </div>
+
+    <!-- Refinement Comparison Modal -->
+    <div id="refinement-comparison-modal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content comparison-modal">
+            <div class="modal-header">
+                <h2>🇳🇴 Norwegian Refinement Comparison</h2>
+                <button id="close-comparison-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="comparison-stats" id="comparison-stats">
+                <span class="stat">Words: <strong id="stats-original-words">--</strong> → <strong id="stats-refined-words">--</strong></span>
+                <span class="stat diff" id="stats-diff">--</span>
+                <span class="stat status" id="stats-status">--</span>
+            </div>
+            <div class="comparison-container">
+                <div class="comparison-column">
+                    <h3>Original</h3>
+                    <div class="comparison-content" id="comparison-original"></div>
+                </div>
+                <div class="comparison-column">
+                    <h3>Refined (Borealis)</h3>
+                    <div class="comparison-content" id="comparison-refined"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="toggle-diff-view" class="secondary-btn">Show Diff Highlights</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=6.13.1"></script>
+</body>
+</html>

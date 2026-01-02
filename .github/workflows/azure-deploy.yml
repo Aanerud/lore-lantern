@@ -1,0 +1,74 @@
+# Azure App Service Deployment for Lore Lantern
+# Deploys to beta.lorelantern.com on push to main branch
+#
+# This workflow deploys source code and lets Azure's Oryx build system
+# handle Python dependency installation (creates antenv virtual environment).
+#
+# App Service: lorelantern-sweden (Sweden Central)
+# AI Services: aaner-mjaezuiz-swedencentral (Model Router + Claude)
+
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AZURE_WEBAPP_NAME: lorelantern-sweden
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create deployment package
+      run: |
+        # Create a zip with source code only (no venv - Azure will build it)
+        zip -r deploy.zip . \
+          -x "*.git*" \
+          -x "*.venv*" \
+          -x "*__pycache__*" \
+          -x "*.pytest_cache*" \
+          -x "logs/*" \
+          -x "*.env" \
+          -x "firebase-credentials.json" \
+          -x "tests/*" \
+          -x "scripts/*" \
+          -x "*.DS_Store" \
+          -x "log.txt" \
+          -x "MIGRATION/*" \
+          -x "*.epub" \
+          -x "Harry Potter*" \
+          -x "Dan Brown*" \
+          -x "*.md" \
+          -x ".vscode/*" \
+          -x ".claude/*" \
+          -x "antenv/*"
+
+        echo "Deployment package contents:"
+        unzip -l deploy.zip | head -30
+        echo "..."
+        echo "Deployment package size:"
+        du -h deploy.zip
+
+    - name: Login to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: deploy.zip
+
+    - name: Azure logout
+      run: |
+        az logout
+      if: always()

@@ -1,0 +1,49 @@
+# Kids Storyteller V2 - Python Dependencies
+
+# SQLite fix for Azure App Service (ChromaDB requires sqlite3 >= 3.35.0)
+pysqlite3-binary==0.5.4
+
+# Core Framework
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+python-dotenv==1.0.1
+
+# Multi-Agent AI System
+crewai==0.80.0
+crewai-tools==0.17.0
+
+# LLM Providers
+openai>=1.55.0
+anthropic>=0.40.0
+google-generativeai==0.8.3
+langchain-google-genai==2.0.7
+litellm==1.52.9
+
+# Firebase (DEPRECATED - being replaced by Azure SQL)
+firebase-admin==6.5.0
+
+# Azure SQL Database & Blob Storage
+pyodbc==5.1.0
+azure-storage-blob==12.23.1
+
+# Microsoft Foundry (Azure AI) - Managed Identity support
+azure-identity>=1.15.0
+
+# Voice Processing
+# ElevenLabs (primary - best quality, handles expressiveness natively)
+elevenlabs==2.27.0
+# Google Cloud Speech (fallback for STT and legacy TTS)
+google-cloud-speech==2.27.0
+google-cloud-texttospeech==2.17.2
+
+# WebSocket Support
+websockets==13.1
+python-multipart==0.0.12
+
+# Utilities
+requests==2.32.3
+aiofiles==24.1.0
+
+# Production Server
+gunicorn==21.2.0
