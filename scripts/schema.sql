@@ -133,6 +133,10 @@ CREATE TABLE chapters (
     tts_status NVARCHAR(50) NOT NULL DEFAULT 'pending',  -- pending | generating | ready | failed
     tts_error NVARCHAR(MAX) NULL,            -- Error message if TTS failed
 
+    -- Language refinement (Norwegian Borealis model)
+    language_refined BIT NOT NULL DEFAULT 0,              -- Whether refined by language model
+    pre_refinement_content NVARCHAR(MAX) NULL,            -- Original content before refinement
+
     word_count INT NOT NULL DEFAULT 0,
     reading_time_minutes INT NOT NULL DEFAULT 0,
     created_at DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
@@ -282,4 +286,13 @@ PRINT 'Schema created successfully!';
 --     ALTER TABLE chapters ADD tts_status NVARCHAR(50) NOT NULL DEFAULT 'pending';
 --     ALTER TABLE chapters ADD tts_error NVARCHAR(MAX) NULL;
 --     PRINT 'Added tts_status and tts_error columns to chapters table';
+-- END
+
+-- Migration: Add language_refined and pre_refinement_content columns to chapters table
+-- IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+--                WHERE TABLE_NAME = 'chapters' AND COLUMN_NAME = 'language_refined')
+-- BEGIN
+--     ALTER TABLE chapters ADD language_refined BIT NOT NULL DEFAULT 0;
+--     ALTER TABLE chapters ADD pre_refinement_content NVARCHAR(MAX) NULL;
+--     PRINT 'Added language_refined and pre_refinement_content columns to chapters table';
 -- END

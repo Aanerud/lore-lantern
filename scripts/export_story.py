@@ -140,10 +140,11 @@ def get_story_data(conn, story_id: str):
         "updated_at": story_row[6],
     }
 
-    # Get chapters
+    # Get chapters (including language refinement data)
     cursor.execute("""
         SELECT id, number, title, synopsis, content, characters_featured,
-               word_count, reading_time_minutes, status, created_at
+               word_count, reading_time_minutes, status, created_at,
+               language_refined, pre_refinement_content
         FROM chapters
         WHERE story_id = ?
         ORDER BY number
@@ -156,12 +157,14 @@ def get_story_data(conn, story_id: str):
             "number": row[1],
             "title": row[2],
             "synopsis": row[3] or "",
-            "content": row[4] or "",
+            "content": row[4] or "",  # This is refined content if language_refined=True
             "characters_featured": json.loads(row[5]) if row[5] else [],
             "word_count": row[6] or 0,
             "reading_time_minutes": row[7] or 0,
             "status": row[8],
             "created_at": row[9],
+            "language_refined": bool(row[10]) if row[10] is not None else False,
+            "pre_refinement_content": row[11] or "",  # Original before refinement
         })
     story["chapters"] = chapters
 
@@ -347,9 +350,15 @@ def generate_markdown(story: dict) -> str:
             content = chapter.get("content", "")
             featured = chapter.get("characters_featured", [])
             word_count = chapter.get("word_count", 0)
+            language_refined = chapter.get("language_refined", False)
 
             md.append(f"### Chapter {number}: {ch_title}")
             md.append("")
+
+            # Show refinement badge if chapter was refined
+            if language_refined:
+                md.append("🇳🇴 *Language refined with Borealis*")
+                md.append("")
 
             if synopsis:
                 md.append(f"> {synopsis}")
@@ -472,13 +481,17 @@ def main():
     output_path.write_text(markdown, encoding="utf-8")
 
     # Summary
-    num_chapters = len(story.get("chapters", []))
+    chapters_list = story.get("chapters", [])
+    num_chapters = len(chapters_list)
     num_characters = len(story.get("characters", []))
-    total_words = sum(ch.get("word_count", 0) for ch in story.get("chapters", []))
+    total_words = sum(ch.get("word_count", 0) for ch in chapters_list)
+    num_refined = sum(1 for ch in chapters_list if ch.get("language_refined", False))
 
     print(f"Exported successfully!")
     print(f"  File: {output_path}")
     print(f"  Chapters: {num_chapters}")
+    if num_refined > 0:
+        print(f"  Language refined: {num_refined}/{num_chapters} chapters (Borealis)")
     print(f"  Characters: {num_characters}")
     print(f"  Total words: {total_words:,}")
     print()

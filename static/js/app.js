@@ -932,6 +932,11 @@ class DebugPanel {
 
     displayChapters(chapters) {
         console.log('📖 displayChapters called with:', chapters);
+        console.log('📖 Refinement data from server:', chapters.map(ch => ({
+            number: ch.number,
+            language_refined: ch.language_refined,
+            pre_refinement_content: ch.pre_refinement_content ? `${ch.pre_refinement_content.length} chars` : null
+        })));
 
         if (!chapters.length) {
             this.chaptersData = [];
@@ -940,9 +945,12 @@ class DebugPanel {
         }
 
         // Normalize chapter data - ensure each chapter has a chapter_number
+        // Server uses 'number', frontend uses 'chapter_number'
         this.chaptersData = chapters.map((ch, idx) => ({
             ...ch,
-            chapter_number: ch.chapter_number ?? ch.chapterNumber ?? (idx + 1)
+            chapter_number: ch.chapter_number ?? ch.chapterNumber ?? ch.number ?? (idx + 1),
+            // Ensure boolean for language_refined (server might send 0/1 or true/false)
+            language_refined: Boolean(ch.language_refined)
         }));
 
         this.chapterTabs.innerHTML = '';
@@ -1151,11 +1159,25 @@ class DebugPanel {
 
         // Show/hide compare button based on whether chapter has refinement data
         if (this.compareRefinementBtn) {
-            const hasRefinementData = chapter.language_refined && chapter.pre_refinement_content;
+            const chapterNum = parseInt(chapter.chapter_number); // Ensure integer for lookup
+
+            // Check server data first
+            const hasServerRefinementData = chapter.language_refined && chapter.pre_refinement_content;
+            // Check our local tracking from WebSocket events (use integer key)
+            const hasLocalRefinementData = this.chapterRefinementStatus?.[chapterNum]?.refined === true;
+            // Check lastRefinementData from manual refinement (compare as integers)
+            const hasManualRefinementData = this.lastRefinementData?.chapterNumber === chapterNum;
+
+            const hasRefinementData = hasServerRefinementData || hasLocalRefinementData || hasManualRefinementData;
+
             console.log('🔍 Refinement check:', {
-                chapterNum: chapter.chapter_number,
+                chapterNum,
                 language_refined: chapter.language_refined,
                 has_pre_refinement: !!chapter.pre_refinement_content,
+                hasLocalRefinement: hasLocalRefinementData,
+                hasManualRefinement: hasManualRefinementData,
+                chapterRefinementStatus: this.chapterRefinementStatus,
+                lastRefinementData: this.lastRefinementData,
                 hasRefinementData
             });
             this.compareRefinementBtn.classList.toggle('hidden', !hasRefinementData);
@@ -1543,11 +1565,12 @@ class DebugPanel {
             return;
         }
 
-        this.addSystemMessage(`🇳🇴 Refining Chapter ${this.currentChapterTab} with Borealis...`);
+        const chapterNum = parseInt(this.currentChapterTab); // Ensure integer
+        this.addSystemMessage(`🇳🇴 Refining Chapter ${chapterNum} with Borealis...`);
 
         try {
             const response = await fetch(
-                `${this.apiBaseUrl}/stories/${this.currentStoryId}/chapters/${this.currentChapterTab}/refine-norwegian`,
+                `${this.apiBaseUrl}/stories/${this.currentStoryId}/chapters/${chapterNum}/refine-norwegian`,
                 { method: 'POST' }
             );
 
@@ -1557,9 +1580,9 @@ class DebugPanel {
                 throw new Error(data.detail || `API error: ${response.status}`);
             }
 
-            // Store refinement data for comparison
+            // Store refinement data for comparison (use integer for consistency)
             this.lastRefinementData = {
-                chapterNumber: this.currentChapterTab,
+                chapterNumber: chapterNum,
                 originalContent: data.original_content_full,
                 refinedContent: data.refined_content_full,
                 originalWordCount: data.original_word_count,
@@ -1568,18 +1591,31 @@ class DebugPanel {
                 wasRefined: data.was_refined
             };
 
+            // Also store in chapterRefinementStatus for the selectChapter check
+            this.chapterRefinementStatus = this.chapterRefinementStatus || {};
+            this.chapterRefinementStatus[chapterNum] = {
+                refined: true,
+                wordsBefore: data.original_word_count,
+                wordsAfter: data.refined_word_count,
+                model: 'borealis'
+            };
+
+            console.log('🔍 Manual refinement stored for chapter', chapterNum, {
+                lastRefinementData: this.lastRefinementData,
+                chapterRefinementStatus: this.chapterRefinementStatus
+            });
+
             // Show compare button
             if (this.compareRefinementBtn) {
                 this.compareRefinementBtn.classList.remove('hidden');
             }
 
+            // Note: Success message is shown by WebSocket handler (language_refinement_completed)
+            // to avoid duplicate messages. Just refresh story data here.
             if (data.was_refined) {
-                this.addSystemMessage(
-                    `✅ Refined! ${data.original_word_count} → ${data.refined_word_count} words (${data.word_diff >= 0 ? '+' : ''}${data.word_diff}) — Click 🔍 to compare`
-                );
-                // Refresh story to show updated content
                 await this.fetchStoryDetails(this.currentStoryId);
             } else {
+                // No changes - show message here since WebSocket won't have useful info
                 this.addSystemMessage('ℹ️ No changes made — Click 🔍 to compare and verify');
             }
 
@@ -1595,7 +1631,25 @@ class DebugPanel {
         // Try to get refinement data from current chapter first, then fall back to lastRefinementData
         let data = null;
 
+        console.log('🔍 showComparisonModal debug:', {
+            currentChapterTab: this.currentChapterTab,
+            currentChapterTabType: typeof this.currentChapterTab,
+            chaptersDataLength: this.chaptersData?.length,
+            chaptersData: this.chaptersData?.map(ch => ({
+                chapter_number: ch.chapter_number,
+                chapter_number_type: typeof ch.chapter_number,
+                language_refined: ch.language_refined,
+                has_pre_refinement: !!ch.pre_refinement_content
+            }))
+        });
+
         const currentChapter = this.chaptersData?.find(ch => ch.chapter_number === this.currentChapterTab);
+        console.log('🔍 Found chapter:', currentChapter ? {
+            chapter_number: currentChapter.chapter_number,
+            language_refined: currentChapter.language_refined,
+            pre_refinement_content_length: currentChapter.pre_refinement_content?.length
+        } : 'NOT FOUND');
+
         if (currentChapter?.language_refined && currentChapter?.pre_refinement_content) {
             // Use chapter data for comparison
             const originalContent = currentChapter.pre_refinement_content;
@@ -1702,6 +1756,9 @@ class DebugPanel {
         const original = this.currentComparisonData?.originalContent || '';
         const refined = this.currentComparisonData?.refinedContent || '';
 
+        // Helper to normalize words for comparison (strip punctuation, lowercase)
+        const normalizeWord = (w) => w.toLowerCase().replace(/[.,!?;:"'«»()\[\]]/g, '');
+
         // Split into words while preserving whitespace structure
         const originalWords = original.split(/(\s+)/);
         const refinedWords = refined.split(/(\s+)/);
@@ -1710,17 +1767,21 @@ class DebugPanel {
         const originalHighlighted = [];
         const refinedHighlighted = [];
 
-        // Create word sets for quick lookup
-        const originalWordSet = new Set(original.toLowerCase().split(/\s+/).filter(w => w));
-        const refinedWordSet = new Set(refined.toLowerCase().split(/\s+/).filter(w => w));
+        // Create normalized word sets for quick lookup
+        const originalWordSet = new Set(
+            original.split(/\s+/).filter(w => w).map(normalizeWord)
+        );
+        const refinedWordSet = new Set(
+            refined.split(/\s+/).filter(w => w).map(normalizeWord)
+        );
 
-        // Highlight words that differ
+        // Highlight words in ORIGINAL that are NOT in refined (removed/changed)
         for (const word of originalWords) {
             if (word.trim() === '') {
                 originalHighlighted.push(word);
             } else {
-                const lowerWord = word.toLowerCase().replace(/[.,!?;:"'()]/g, '');
-                if (!refinedWordSet.has(lowerWord) && lowerWord) {
+                const normalized = normalizeWord(word);
+                if (normalized && !refinedWordSet.has(normalized)) {
                     originalHighlighted.push(`<span class="diff-removed">${this.escapeHtml(word)}</span>`);
                 } else {
                     originalHighlighted.push(this.escapeHtml(word));
@@ -1728,12 +1789,13 @@ class DebugPanel {
             }
         }
 
+        // Highlight words in REFINED that are NOT in original (added/new)
         for (const word of refinedWords) {
             if (word.trim() === '') {
                 refinedHighlighted.push(word);
             } else {
-                const lowerWord = word.toLowerCase().replace(/[.,!?;:"'()]/g, '');
-                if (!originalWordSet.has(lowerWord) && lowerWord) {
+                const normalized = normalizeWord(word);
+                if (normalized && !originalWordSet.has(normalized)) {
                     refinedHighlighted.push(`<span class="diff-added">${this.escapeHtml(word)}</span>`);
                 } else {
                     refinedHighlighted.push(this.escapeHtml(word));
@@ -2026,6 +2088,38 @@ class DebugPanel {
                     this.updateTimelinePhase(data.data.chapter, 'polish', 'completed');
                 }
                 break;
+
+            case 'language_refinement_completed': {
+                // Norwegian language refinement completed for a chapter
+                // IMPORTANT: Ensure chNum is integer for consistent object key lookup
+                const chNum = parseInt(data.data.chapter);
+                const wordsBefore = data.data.word_count_before;
+                const wordsAfter = data.data.word_count_after;
+                const diff = wordsAfter - wordsBefore;
+                const diffStr = diff >= 0 ? `+${diff}` : `${diff}`;
+
+                this.addSystemMessage(
+                    `✅ Refined! ${wordsBefore} → ${wordsAfter} words (${diffStr}) — Click 🔍 to compare`
+                );
+
+                // Store refinement metadata for this chapter (integer key for consistency)
+                this.chapterRefinementStatus = this.chapterRefinementStatus || {};
+                this.chapterRefinementStatus[chNum] = {
+                    refined: true,
+                    wordsBefore,
+                    wordsAfter,
+                    model: data.data.model
+                };
+
+                console.log('🔍 Stored refinement status for chapter', chNum, this.chapterRefinementStatus);
+
+                // Show button immediately if viewing this chapter
+                if (this.currentChapterTab === chNum && this.compareRefinementBtn) {
+                    this.compareRefinementBtn.classList.remove('hidden');
+                    console.log('🔍 Showing compare button immediately for chapter', chNum);
+                }
+                break;
+            }
 
             case 'pre_story_inputs_queued':
                 // Handled by addEventToLog - shows pre-story messages queued for Ch1

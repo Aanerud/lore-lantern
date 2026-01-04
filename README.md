@@ -170,11 +170,83 @@ If nothing is configured, the system falls back to `azure/model-router`.
 
 ---
 
-## Local Model Support (Ollama)
+## Custom Language Refiners
 
-Set `OLLAMA_BASE_URL` in `.env` to use local models. See `.env.example` for details.
+We support **custom language refiners** - specialized agents that polish AI-generated text to sound more natural in a specific language. After a chapter has been polished and approved by all agents, if a language refiner is configured for the story's language, it runs automatically.
 
-The `language_refiner` agent uses NB AI Lab's Borealis model locally to polish Norwegian text.
+### How It Works
+
+The system checks two things:
+
+1. **Agent configured**: `language_refiner_{lang}` exists in `src/config/models.yaml`
+2. **Prompts exist**: `src/prompts/refine/{lang}.py` file is present
+
+If both exist, the refiner runs. Otherwise, the chapter is saved as-is.
+
+### Norwegian Example (Included)
+
+We include a Norwegian refiner using NB AI Lab's Borealis model:
+
+**`src/config/models.yaml`:**
+```yaml
+language_refiner_no:
+  display_name: "Borealis"
+  description: "Norwegian language refinement (NB AI Lab Borealis-4B on Ollama)"
+  language: "no"  # Matches household/story language
+  model: "ollama/hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:BF16"
+  temperature: 0.3
+  max_tokens: 8000
+  timeout: 300
+```
+
+**`src/prompts/refine/no.py`:** Contains Norwegian-specific patterns:
+- Unnatural word choices ("gjøre en beslutning" → "ta en beslutning")
+- English word order patterns
+- Overly formal words that should be conversational
+- English loanwords with Norwegian equivalents
+
+### Adding a New Language Refiner
+
+1. **Create the prompt file** at `src/prompts/refine/{lang}.py`:
+
+```python
+# src/prompts/refine/sv.py (Swedish example)
+
+LANGUAGE_CODE = "sv"
+LANGUAGE_NAME = "Swedish"
+
+def get_refinement_prompt(paragraph: str) -> str:
+    return f"""Förbättra denna svenska text...
+
+{paragraph}"""
+
+def validate_response(response: str, original: str) -> str:
+    # Clean up LLM response, return original if invalid
+    if not response or len(response) < 20:
+        return original
+    return response.strip()
+```
+
+2. **Add the agent** to `src/config/models.yaml`:
+
+```yaml
+language_refiner_sv:
+  display_name: "Swedish Refiner"
+  description: "Swedish language refinement"
+  language: "sv"
+  model: "ollama/some-swedish-model"  # Or any LiteLLM-compatible model
+  temperature: 0.3
+  max_tokens: 8000
+  timeout: 300
+```
+
+3. **That's it!** Stories with `language: "sv"` will now use the Swedish refiner.
+
+### Requirements
+
+- For Ollama models: Set `OLLAMA_BASE_URL` in `.env`
+- For cloud models: Set the appropriate API key
+- The model can be any LiteLLM-compatible model (local or cloud)
 
 ---
 
@@ -240,29 +312,29 @@ Lore Lantern uses Azure SQL Database for structured data and Azure Blob Storage 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         CLIENT REQUEST                                   │
+│                         CLIENT REQUEST                                  │
 │  POST /api/stories/init                                                 │
 │  { prompt: "Tell me about Vikings", child_id: "..." }                   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         FASTAPI ROUTES                                   │
+│                         FASTAPI ROUTES                                  │
 │  src/api/routes.py                                                      │
-│  - Validates input                                                       │
-│  - Creates Story object                                                  │
-│  - Saves to Azure SQL                                                    │
-│  - Returns story_id                                                      │
+│  - Validates input                                                      │
+│  - Creates Story object                                                 │
+│  - Saves to Azure SQL                                                   │
+│  - Returns story_id                                                     │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                       STORY COORDINATOR                                  │
+│                       STORY COORDINATOR                                 │
 │  src/crew/coordinator.py                                                │
-│                                                                          │
+│                                                                         │
 │  1. StructureAgent    → Create 5-chapter outline                        │
 │  2. CharacterAgent    → Generate character profiles                     │
-│  3. For each chapter:                                                    │
+│  3. For each chapter:                                                   │
 │     a. NarrativeAgent  → Write chapter draft                            │
 │     b. Round Table     → 6 parallel reviewers                           │
 │     c. VoiceDirector   → Add audio tags                                 │
@@ -272,16 +344,16 @@ Lore Lantern uses Azure SQL Database for structured data and Azure Blob Storage 
                                     │
                     ┌───────────────┴───────────────┐
                     ▼                               ▼
-┌──────────────────────────────┐    ┌──────────────────────────────┐
-│       AZURE SQL DATABASE      │    │     AZURE BLOB STORAGE        │
-│                               │    │                               │
-│  households                   │    │  lorelantern-audio/           │
+┌──────────────────────────────┐    ┌────────────────────────────────┐
+│       AZURE SQL DATABASE     │    │     AZURE BLOB STORAGE         │
+│                              │    │                                │
+│  households                  │    │  lorelantern-audio/            │
 │    └─ children               │    │    └─ {household_id}/          │
 │         └─ stories           │    │         └─ {story_id}/         │
 │              ├─ chapters     │    │              ├─ chapter_1.mp3  │
 │              ├─ characters   │    │              ├─ chapter_2.mp3  │
 │              └─ dialogues    │    │              └─ ...            │
-└──────────────────────────────┘    └──────────────────────────────┘
+└──────────────────────────────┘    └────────────────────────────────┘
 ```
 
 ### Database Schema (Azure SQL)
@@ -438,7 +510,7 @@ Lore Lantern uses 10 specialized AI agents, each with a distinct persona and opt
 | **NarrativeAgent** | Nnedi Okofor (Africanfuturist) | `claude-opus-4-5-20251101` | Chapter writing, prose craft |
 | **VoiceDirectorAgent** | Jim Dale | `gemini-3-flash-preview` | SSML/audio tags for expressive narration |
 | **CompanionAgent** | Hanan (Friendly Teacher) | `gpt-4o-mini` | Real-time dialogue, child interaction |
-| **LanguageRefiner** | Borealis | `ollama/borealis-4b` | Norwegian text refinement (local) |
+| **LanguageRefiner** | Per-language | Configurable | Post-polish text refinement (see [Custom Language Refiners](#custom-language-refiners)) |
 
 ### Round Table Reviewers (6 Parallel)
 
@@ -462,7 +534,7 @@ groups:
   roundtable: [structure, factcheck, character, line_editor, continuity, tension]
   writers: [narrative, dialogue]
   post: [voice_director]
-  refiners: [language_refiner]
+  refiners: [language_refiner_no, language_refiner_sv, ...]  # Per-language
 ```
 
 Override an entire group:

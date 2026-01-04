@@ -1109,6 +1109,10 @@ class Chapter(BaseModel):
     # Generation Analytics (for model comparison and optimization)
     generation_metadata: Optional[GenerationMetadata] = Field(None, description="LLM generation details: model, tokens, timing")
 
+    # Language Refinement (for Norwegian Borealis model post-processing)
+    language_refined: bool = Field(default=False, description="Whether chapter was refined by language model (e.g., Borealis)")
+    pre_refinement_content: Optional[str] = Field(None, description="Original content before language refinement, for comparison")
+
     @validator('word_count', always=True)
     def calculate_word_count(cls, v, values):
         if 'content' in values:

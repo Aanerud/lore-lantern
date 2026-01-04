@@ -47,14 +47,17 @@ groups:
     model: null
 
   refiners:
-    description: "Language-specific text refinement agents"
-    members:
-      - language_refiner  # Borealis - Norwegian refinement
+    description: "Language-specific text refinement agents (per-language)"
+    members: []  # Populated dynamically based on language_refiner_{lang} agents
     model: null
 
 # Per-Agent Configuration
 # Each agent has: display_name, description, model, temperature, max_tokens, timeout
 # Set model: null to use group/default, or specify a model to override
+#
+# Language Refiners: Named as language_refiner_{lang} (e.g., language_refiner_no)
+# They run automatically when a story's language matches AND prompts exist at
+# src/prompts/refine/{lang}.py
 agents:
   # === ROUND TABLE REVIEWERS ===
 
@@ -135,11 +138,24 @@ agents:
     timeout: 900
 
   # === LANGUAGE REFINERS ===
+  # Named as language_refiner_{lang} - runs when story language matches
+  # Requires corresponding prompts at src/prompts/refine/{lang}.py
 
-  language_refiner:
+  language_refiner_no:
     display_name: "Borealis"
-    description: "Norwegian language refinement (NB AI Lab Borealis-4B model on Ollama)"
-    model: "ollama/hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:BF16"  # Local Ollama server
+    description: "Norwegian language refinement (NB AI Lab Borealis-4B on Ollama)"
+    language: "no"  # ISO 639-1 code - matches household/story language
+    model: "ollama/hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:BF16"
     temperature: 0.3  # Low for consistency - preserve structure
     max_tokens: 8000
     timeout: 300
+
+  # Example: Swedish refiner (uncomment when prompts/refine/sv.py exists)
+  # language_refiner_sv:
+  #   display_name: "Swedish Refiner"
+  #   description: "Swedish language refinement"
+  #   language: "sv"
+  #   model: "ollama/some-swedish-model"
+  #   temperature: 0.3
+  #   max_tokens: 8000
+  #   timeout: 300

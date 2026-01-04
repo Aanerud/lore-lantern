@@ -2251,13 +2251,7 @@ async def refine_chapter_norwegian(
         original_content = chapter.content
         original_words = len(original_content.split())
 
-        # Emit start event
-        await story_events.emit("language_refinement_started", story_id, {
-            "chapter": chapter_number,
-            "language": language,
-            "model": "ollama/hf.co/NbAiLab/borealis-4b-instruct-preview-gguf:BF16",
-            "content_length": len(original_content)
-        })
+        # Note: Events are emitted by coordinator._refine_language() to avoid duplicates
 
         # Run refinement (using private method directly for debug endpoint)
         refined_content = await _coordinator._refine_language(
@@ -2271,7 +2265,9 @@ async def refine_chapter_norwegian(
         was_refined = refined_content != original_content
 
         if was_refined:
-            # Update chapter with refined content
+            # Store original for comparison, update with refined
+            chapter.pre_refinement_content = original_content
+            chapter.language_refined = True
             chapter.content = refined_content
             await _coordinator.storage.save_chapter(story_id, chapter)
 

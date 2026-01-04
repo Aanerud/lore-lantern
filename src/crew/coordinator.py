@@ -3091,16 +3091,19 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
         language: str
     ) -> str:
         """
-        Apply language-specific refinement using local Ollama model.
+        Apply language-specific refinement using configured language refiner.
 
-        For Norwegian: Uses NB AI Lab's Borealis-4B model for natural phrasing.
-        Skips gracefully if Ollama is unavailable.
+        This is a dynamic system that checks:
+        1. If a language_refiner_{lang} agent exists in models.yaml
+        2. If prompts exist at src/prompts/refine/{lang}.py
+
+        If both exist, runs the refiner. Otherwise, skips gracefully.
 
         This runs AFTER polish pass, before save. It preserves structure
         and plot but improves word choice, idioms, and natural flow for
         the target language.
 
-        Strategy for 4B models:
+        Strategy for small models:
         - Process paragraph by paragraph (chunking)
         - Use targeted prompts with specific patterns to fix
         - Include few-shot examples for better understanding
@@ -3115,24 +3118,35 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
             Refined content, or original if refinement unavailable
         """
         from src.config import get_settings
+        from src.prompts.refine import is_language_supported, get_refiner_for_language
         settings = get_settings()
 
-        # Only refine Norwegian for now
-        if language != "no":
+        # Check if prompts exist for this language
+        if not is_language_supported(language):
+            self.logger.debug(f"   📝 No refinement prompts for '{language}' (add src/prompts/refine/{language}.py)")
             return chapter_content
 
-        # Check if Ollama is configured
-        if not settings.ollama_base_url:
+        # Check if a language refiner agent is configured
+        refiner_agent = f"language_refiner_{language}"
+        try:
+            model = self.router.get_model_for_agent(refiner_agent)
+        except Exception:
+            self.logger.debug(f"   📝 No '{refiner_agent}' agent in models.yaml")
+            return chapter_content
+
+        # Check if Ollama is configured (for local models)
+        if model.startswith("ollama/") and not settings.ollama_base_url:
             self.logger.info(f"   📝 Language refinement skipped: OLLAMA_BASE_URL not configured")
             return chapter_content
 
         try:
             import litellm
 
-            # Get model from router
-            model = self.router.get_model_for_agent("language_refiner")
+            # Load the language-specific refiner module
+            refiner = get_refiner_for_language(language)
+            lang_name = getattr(refiner, 'LANGUAGE_NAME', language.upper())
 
-            self.logger.info(f"\n   🇳🇴 NORWEGIAN REFINEMENT - Polishing for natural Norwegian phrasing...")
+            self.logger.info(f"\n   🌐 {lang_name.upper()} REFINEMENT - Polishing for natural {lang_name} phrasing...")
             self.logger.info(f"      Model: {model}")
             self.logger.info(f"      Strategy: Paragraph-by-paragraph with targeted patterns")
 
@@ -3157,11 +3171,12 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
                     refined_paragraphs.append(paragraph)
                     continue
 
-                # Refine this paragraph
-                refined_para = await self._refine_paragraph_norwegian(
+                # Refine this paragraph using the language-specific refiner
+                refined_para = await self._refine_paragraph(
                     paragraph=paragraph,
                     model=model,
-                    settings=settings
+                    settings=settings,
+                    refiner=refiner
                 )
 
                 # Check if changes were made
@@ -3178,7 +3193,7 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
             refined_words = len(refined_content.split())
             word_diff = refined_words - original_words
 
-            self.logger.info(f"   ✅ Norwegian refinement complete:")
+            self.logger.info(f"   ✅ {lang_name} refinement complete:")
             self.logger.info(f"      Words: {original_words} → {refined_words} ({'+' if word_diff >= 0 else ''}{word_diff})")
             self.logger.info(f"      Paragraphs changed: {changes_made}/{len(paragraphs)}")
 
@@ -3205,92 +3220,56 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
             })
             return chapter_content
 
-    async def _refine_paragraph_norwegian(
+    async def _refine_paragraph(
         self,
         paragraph: str,
         model: str,
-        settings
+        settings,
+        refiner
     ) -> str:
         """
-        Refine a single paragraph using targeted Norwegian language patterns.
+        Refine a single paragraph using language-specific prompts.
 
-        Uses few-shot examples and specific patterns optimized for the
-        Borealis 4B model (based on Gemma 3 4B).
+        Uses the dynamically loaded refiner module which provides:
+        - get_refinement_prompt(paragraph) -> str
+        - validate_response(response, original) -> str
 
         Args:
             paragraph: Single paragraph to refine
-            model: Ollama model identifier
+            model: LLM model identifier
             settings: App settings with ollama_base_url
+            refiner: Language-specific refiner module from src/prompts/refine/{lang}.py
 
         Returns:
             Refined paragraph, or original if refinement fails
         """
         import litellm
 
-        # Targeted prompt with few-shot examples
-        # Optimized for small models: specific, concise, with examples
-        prompt = f"""Forbedre denne norske teksten. Se etter:
-
-1. Unaturlige ordvalg (f.eks. "gjøre en beslutning" → "ta en beslutning")
-2. Stiv ordstilling fra engelsk (f.eks. "Han var veldig glad" → "Han ble kjempeglad")
-3. Formelle ord som kan være mer muntlige (f.eks. "imidlertid" → "men", "dessuten" → "og")
-4. Engelske lånord med norske alternativer (f.eks. "basically" → "egentlig")
-
-Eksempler:
-ORIGINAL: Hun gjorde en beslutning om å forlate stedet.
-BEDRE: Hun bestemte seg for å dra.
-
-ORIGINAL: Det var veldig interessant for ham å se dette.
-BEDRE: Han syntes det var spennende å se.
-
-ORIGINAL: Han hadde ikke noen idé om hva som skjedde.
-BEDRE: Han ante ikke hva som foregikk.
-
-Nå, forbedre denne teksten. Behold handlingen og stemningen. Skriv KUN den forbedrede teksten:
-
-{paragraph}"""
+        # Get the language-specific prompt
+        prompt = refiner.get_refinement_prompt(paragraph)
 
         try:
-            response = await litellm.acompletion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                api_base=settings.ollama_base_url,
-                max_tokens=1500,  # Smaller limit for single paragraph
-                temperature=0.3,
-                timeout=60,  # Shorter timeout per paragraph
-                drop_params=True
-            )
+            # Build kwargs for litellm - include api_base only for ollama models
+            call_kwargs = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1500,  # Smaller limit for single paragraph
+                "temperature": 0.3,
+                "timeout": 60,  # Shorter timeout per paragraph
+                "drop_params": True
+            }
 
-            refined = response.choices[0].message.content.strip()
+            # Only set api_base for Ollama models
+            if model.startswith("ollama/") and settings.ollama_base_url:
+                call_kwargs["api_base"] = settings.ollama_base_url
 
-            # Validate the response
-            if not refined or len(refined) < 20:
-                return paragraph
+            response = await litellm.acompletion(**call_kwargs)
+            raw_response = response.choices[0].message.content.strip()
 
-            # Check for obvious problems (model adding explanations, etc.)
-            problem_indicators = [
-                "her er",
-                "forbedret tekst:",
-                "endringer:",
-                "jeg har",
-                "teksten er",
-                "original:",
-                "###"
-            ]
-            refined_lower = refined.lower()
-            for indicator in problem_indicators:
-                if refined_lower.startswith(indicator):
-                    # Model added preamble, try to extract just the text
-                    # Look for the actual content after common prefixes
-                    lines = refined.split('\n')
-                    for line in lines:
-                        if len(line.strip()) > 50 and not any(ind in line.lower() for ind in problem_indicators):
-                            refined = line.strip()
-                            break
-                    else:
-                        return paragraph  # Couldn't salvage, use original
+            # Use the refiner's validation function
+            refined = refiner.validate_response(raw_response, paragraph)
 
-            # Sanity check: refined should be roughly similar length (±50%)
+            # Additional sanity check: length shouldn't change drastically (±50%)
             orig_len = len(paragraph)
             refined_len = len(refined)
             if refined_len < orig_len * 0.5 or refined_len > orig_len * 1.5:
@@ -3757,15 +3736,21 @@ Work these requests into the chapter narrative naturally.
             story_language = getattr(story.preferences, 'language', 'en')
         story_language = story_language or 'en'
 
-        if story_language == "no":
-            original_content = final_chapter_data.get('content', '')
-            refined_content = await self._refine_language(
-                story_id=story_id,
-                chapter_content=original_content,
-                chapter_number=chapter_number,
-                language=story_language
-            )
-            # Store both versions for side-by-side comparison
+        # LANGUAGE REFINEMENT: Run if configured for this language
+        # The _refine_language method checks if both:
+        #   1. A language_refiner_{lang} agent exists in models.yaml
+        #   2. Prompts exist at src/prompts/refine/{lang}.py
+        # If either is missing, it returns the original content unchanged.
+        original_content = final_chapter_data.get('content', '')
+        refined_content = await self._refine_language(
+            story_id=story_id,
+            chapter_content=original_content,
+            chapter_number=chapter_number,
+            language=story_language
+        )
+
+        # Only mark as refined if content actually changed
+        if refined_content != original_content:
             final_chapter_data['pre_refinement_content'] = original_content
             final_chapter_data['content'] = refined_content
             final_chapter_data['language_refined'] = True

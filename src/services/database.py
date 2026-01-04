@@ -667,7 +667,8 @@ class DatabaseService:
                 SELECT id, number, title, synopsis, content, tts_content, audio_blob_url,
                        status, characters_featured, educational_points, vocabulary_words,
                        facts, statements, user_inputs_applied, round_table_review,
-                       voice_direction, word_count, reading_time_minutes, created_at
+                       voice_direction, word_count, reading_time_minutes, created_at,
+                       language_refined, pre_refinement_content
                 FROM chapters WHERE story_id = ? ORDER BY number
             """, (uuid_id,))
             chapters = []
@@ -688,7 +689,9 @@ class DatabaseService:
                     status=ChapterStatus(ch_row[7]),
                     word_count=ch_row[16],
                     reading_time_minutes=ch_row[17],
-                    created_at=ch_row[18]
+                    created_at=ch_row[18],
+                    language_refined=bool(ch_row[19]) if ch_row[19] is not None else False,
+                    pre_refinement_content=ch_row[20]
                 ))
 
             # Get characters
@@ -835,7 +838,8 @@ class DatabaseService:
                         vocabulary_words = ?, facts = ?, statements = ?,
                         user_inputs_applied = ?, round_table_review = ?, voice_direction = ?,
                         generation_metadata = ?, tts_status = ?, tts_error = ?,
-                        word_count = ?, reading_time_minutes = ?
+                        word_count = ?, reading_time_minutes = ?,
+                        language_refined = ?, pre_refinement_content = ?
                     WHERE story_id = ? AND number = ?
                 """, (
                     chapter.title,
@@ -857,6 +861,8 @@ class DatabaseService:
                     chapter.tts_error,
                     chapter.word_count,
                     chapter.reading_time_minutes,
+                    1 if chapter.language_refined else 0,
+                    chapter.pre_refinement_content,
                     uuid_story_id,
                     chapter.number
                 ))
@@ -868,8 +874,8 @@ class DatabaseService:
                      status, characters_featured, educational_points, vocabulary_words,
                      facts, statements, user_inputs_applied, round_table_review,
                      voice_direction, generation_metadata, tts_status, tts_error,
-                     word_count, reading_time_minutes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     word_count, reading_time_minutes, language_refined, pre_refinement_content)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     uuid_chapter_id,
                     uuid_story_id,
@@ -892,7 +898,9 @@ class DatabaseService:
                     chapter.tts_status,
                     chapter.tts_error,
                     chapter.word_count,
-                    chapter.reading_time_minutes
+                    chapter.reading_time_minutes,
+                    1 if chapter.language_refined else 0,
+                    chapter.pre_refinement_content
                 ))
 
             conn.commit()
@@ -914,7 +922,8 @@ class DatabaseService:
                        status, characters_featured, educational_points, vocabulary_words,
                        facts, statements, user_inputs_applied, round_table_review,
                        voice_direction, generation_metadata, tts_status, tts_error,
-                       word_count, reading_time_minutes, created_at
+                       word_count, reading_time_minutes, created_at,
+                       language_refined, pre_refinement_content
                 FROM chapters WHERE story_id = ? AND number = ?
             """, (uuid_story_id, chapter_number))
             row = cursor.fetchone()
@@ -948,7 +957,9 @@ class DatabaseService:
                 tts_error=row[18],
                 word_count=row[19],
                 reading_time_minutes=row[20],
-                created_at=row[21]
+                created_at=row[21],
+                language_refined=bool(row[22]) if row[22] is not None else False,
+                pre_refinement_content=row[23]
             )
 
     async def get_chapter(self, story_id: str, chapter_number: int) -> Optional[Chapter]:
@@ -967,7 +978,8 @@ class DatabaseService:
                        status, characters_featured, educational_points, vocabulary_words,
                        facts, statements, user_inputs_applied, round_table_review,
                        voice_direction, generation_metadata, tts_status, tts_error,
-                       word_count, reading_time_minutes, created_at
+                       word_count, reading_time_minutes, created_at,
+                       language_refined, pre_refinement_content
                 FROM chapters WHERE story_id = ? ORDER BY number
             """, (uuid_id,))
 
@@ -999,7 +1011,9 @@ class DatabaseService:
                     tts_error=row[18],
                     word_count=row[19],
                     reading_time_minutes=row[20],
-                    created_at=row[21]
+                    created_at=row[21],
+                    language_refined=bool(row[22]) if row[22] is not None else False,
+                    pre_refinement_content=row[23]
                 ))
             return chapters
 
