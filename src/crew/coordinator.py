@@ -2509,7 +2509,7 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
                         )
                     return review
         except Exception as e:
-            self.logger.debug(f"JSON parsing failed for {agent_name} review: {e}")
+            self.logger.debug("REVIEW", f"JSON parsing failed for {agent_name} review: {e}")
 
         # Return concern (not approve!) if parsing fails - don't auto-approve broken reviews
         self.logger.warning(f"⚠️ {agent_name}'s review could not be parsed - defaulting to CONCERN")
@@ -3123,7 +3123,7 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
 
         # Check if prompts exist for this language
         if not is_language_supported(language):
-            self.logger.debug(f"   📝 No refinement prompts for '{language}' (add src/prompts/refine/{language}.py)")
+            self.logger.debug("REFINE", f"No refinement prompts for '{language}' (add src/prompts/refine/{language}.py)")
             return chapter_content
 
         # Check if a language refiner agent is configured
@@ -3131,7 +3131,7 @@ Relationships: {json.dumps(character.relationships) if character.relationships e
         try:
             model = self.router.get_model_for_agent(refiner_agent)
         except Exception:
-            self.logger.debug(f"   📝 No '{refiner_agent}' agent in models.yaml")
+            self.logger.debug("REFINE", f"No '{refiner_agent}' agent in models.yaml")
             return chapter_content
 
         # Check if Ollama is configured (for local models)
