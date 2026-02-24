@@ -80,7 +80,7 @@ agents:
   character:
     display_name: "Clarissa"
     description: "Character Reviewer - Jungian Depth (Clarissa Pinkola Estés persona)"
-    model: "claude-opus-4-5-20251101"  # Jungian depth, D&D progression - rich creative output
+    model: "claude-opus-4-6"  # Jungian depth, D&D progression - rich creative output
     temperature: 0.65
     max_tokens: 16000
     timeout: 1800
@@ -114,7 +114,7 @@ agents:
   narrative:
     display_name: "Africanfuturist"
     description: "Story Writer (Nnedi Okofor persona)"
-    model: "claude-opus-4-5-20251101"  # Critical - prose quality is the product
+    model: "claude-opus-4-6"  # Critical - prose quality is the product
     temperature: 0.85
     max_tokens: 16384
     timeout: 1800

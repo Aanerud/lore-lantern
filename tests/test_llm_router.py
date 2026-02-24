@@ -40,45 +40,91 @@ class TestLLMRouterHierarchy:
             if key.startswith('TEST_') and key.endswith('_MODEL'):
                 del os.environ[key]
 
-    def test_default_model_when_no_overrides(self):
-        """Without overrides, agents use default model from YAML."""
+    def test_agents_use_configured_models(self):
+        """Agents with explicit models in YAML use those models."""
         router = LLMRouter()
 
-        # All agents with model: null should use default (azure/model-router)
-        for agent in ['structure', 'character', 'factcheck', 'line_editor',
-                      'continuity', 'tension', 'narrative', 'dialogue']:
+        # Each agent has an explicit model in models.yaml
+        expected = {
+            'structure': 'gemini-3-pro-preview',
+            'character': 'claude-opus-4-6',
+            'factcheck': 'gpt-5.2',
+            'line_editor': 'claude-sonnet-4-5-20250929',
+            'continuity': 'claude-sonnet-4-5-20250929',
+            'tension': 'claude-sonnet-4-5-20250929',
+            'narrative': 'claude-opus-4-6',
+            'dialogue': 'gpt-4o-mini',
+        }
+        for agent, expected_model in expected.items():
             model = router.get_model_for_agent(agent)
-            assert model == 'azure/model-router', f"{agent} should use default model"
+            assert expected_model in model, \
+                f"{agent} should use {expected_model}, got {model}"
 
-    def test_group_override_applies_to_all_members(self):
-        """TEST_ROUNDTABLE_MODEL applies to all 6 reviewers."""
+    def test_group_override_applies_to_agents_without_own_model(self):
+        """TEST_ROUNDTABLE_MODEL applies when agents have no explicit model."""
+        # Create temp config where roundtable agents have model: null
+        config = {
+            'default': {'model': 'azure/model-router', 'temperature': 0.7, 'max_tokens': 8000},
+            'groups': {
+                'roundtable': {
+                    'members': ['structure', 'factcheck'],
+                    'model': None,
+                }
+            },
+            'agents': {
+                'structure': {'display_name': 'Guillermo', 'temperature': 0.75, 'max_tokens': 16384},
+                'factcheck': {'display_name': 'Bill', 'temperature': 0.25, 'max_tokens': 4000},
+            }
+        }
+        tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
+        yaml.dump(config, tmp)
+        tmp.close()
+
         os.environ['TEST_ROUNDTABLE_MODEL'] = 'gemini-3-flash-preview'
-        router = LLMRouter()
+        router = LLMRouter(config_path=tmp.name)
 
-        roundtable_members = ['structure', 'factcheck', 'character',
-                              'line_editor', 'continuity', 'tension']
-
-        for agent in roundtable_members:
+        for agent in ['structure', 'factcheck']:
             model = router.get_model_for_agent(agent)
-            # Should be normalized to gemini/gemini-3-flash-preview
             assert 'gemini-3-flash-preview' in model, \
                 f"{agent} should use roundtable group model"
 
-    def test_agent_override_beats_group_override(self):
+        os.unlink(tmp.name)
+
+    def test_agent_env_override_beats_group_env_override(self):
         """TEST_STRUCTURE_MODEL overrides TEST_ROUNDTABLE_MODEL for Guillermo."""
+        # Create temp config where agents have no explicit model
+        config = {
+            'default': {'model': 'azure/model-router', 'temperature': 0.7, 'max_tokens': 8000},
+            'groups': {
+                'roundtable': {
+                    'members': ['structure', 'factcheck'],
+                    'model': None,
+                }
+            },
+            'agents': {
+                'structure': {'display_name': 'Guillermo', 'temperature': 0.75, 'max_tokens': 16384},
+                'factcheck': {'display_name': 'Bill', 'temperature': 0.25, 'max_tokens': 4000},
+            }
+        }
+        tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
+        yaml.dump(config, tmp)
+        tmp.close()
+
         os.environ['TEST_ROUNDTABLE_MODEL'] = 'gemini-3-flash-preview'
         os.environ['TEST_STRUCTURE_MODEL'] = 'claude-sonnet-4-5'
-        router = LLMRouter()
+        router = LLMRouter(config_path=tmp.name)
 
         # Structure should use agent override (claude), not group (gemini)
         structure_model = router.get_model_for_agent('structure')
         assert 'claude-sonnet-4-5' in structure_model, \
             "Agent override should beat group override"
 
-        # Character should still use group override (gemini)
-        character_model = router.get_model_for_agent('character')
-        assert 'gemini-3-flash-preview' in character_model, \
-            "Character should use group override"
+        # Factcheck should still use group override (gemini)
+        factcheck_model = router.get_model_for_agent('factcheck')
+        assert 'gemini-3-flash-preview' in factcheck_model, \
+            "Factcheck should use group override"
+
+        os.unlink(tmp.name)
 
     def test_roundtable_group_contains_all_reviewers(self):
         """Verify all 6 reviewers are in roundtable group."""
@@ -188,9 +234,10 @@ class TestModelConstraints:
 
     def test_azure_model_router_has_reasoning_effort(self):
         """azure/model-router should have reasoning_effort in extra_body."""
-        router = LLMRouter()  # Uses default azure/model-router
+        router = LLMRouter()
 
-        kwargs = router.get_llm_kwargs('structure')
+        # Use unknown agent which falls to default (azure/model-router)
+        kwargs = router.get_llm_kwargs('nonexistent_agent')
         assert 'extra_body' in kwargs, "Should have extra_body"
         assert kwargs['extra_body'].get('reasoning_effort') == 'medium', \
             "Should have reasoning_effort=medium"
@@ -336,12 +383,17 @@ class TestAgentSpecificParams:
         assert kwargs['temperature'] == 0.75, "Structure should have temp 0.75"
         assert kwargs['max_tokens'] == 16384, "Structure should have max_tokens 16384"
 
-    def test_factcheck_low_temperature(self):
-        """Factcheck agent should have low temperature (0.25) for precision."""
+    def test_factcheck_drops_temperature_for_reasoning_model(self):
+        """Factcheck uses gpt-5.2 (reasoning model) which drops temperature."""
         router = LLMRouter()
         kwargs = router.get_llm_kwargs('factcheck')
 
-        assert kwargs['temperature'] == 0.25, "Factcheck should have temp 0.25"
+        # gpt-5.2 is a reasoning model - temperature gets dropped
+        assert 'temperature' not in kwargs, \
+            "Factcheck (gpt-5.2) should drop temperature (reasoning model)"
+        assert 'extra_body' in kwargs, "Should have extra_body for reasoning model"
+        assert 'max_completion_tokens' in kwargs['extra_body'], \
+            "Should use max_completion_tokens instead of max_tokens"
 
     def test_narrative_high_temperature(self):
         """Narrative agent should have high temperature (0.85) for creativity."""
@@ -374,11 +426,11 @@ def run_quick_verification():
         results.append((agent, display, model))
         print(f"   {display} ({agent}): {model}")
 
-    # Verify hierarchy
-    assert 'claude' in results[0][2].lower(), "Structure should use claude (agent override)"
-    assert 'gemini' in results[1][2].lower(), "Character should use gemini (group override)"
-    assert 'gemini' in results[2][2].lower(), "Factcheck should use gemini (group override)"
-    print("   ✅ Hierarchy verified: Agent > Group > Default")
+    # Verify hierarchy: agent env override wins for structure,
+    # but character/factcheck keep their YAML models (agent-specific > group)
+    assert 'claude' in results[0][2].lower(), "Structure should use claude (agent env override)"
+    assert 'claude' in results[1][2].lower(), "Character keeps its YAML model (agent-specific > group)"
+    print("   ✅ Hierarchy verified: Agent env > Agent YAML > Group > Default")
 
     # Cleanup
     del os.environ['TEST_ROUNDTABLE_MODEL']

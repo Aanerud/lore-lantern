@@ -69,7 +69,7 @@ class FoundryService:
 
     Attributes:
         endpoint: Azure Cognitive Services endpoint
-        api_version: API version for Model Router (default: 2024-12-01-preview)
+        api_version: API version for Model Router (default: 2025-01-01-preview)
         routing_mode: Default routing mode (quality/cost/balanced)
     """
 
@@ -77,7 +77,7 @@ class FoundryService:
         self,
         endpoint: str,
         api_key: Optional[str] = None,
-        api_version: str = "2024-12-01-preview",
+        api_version: str = "2025-01-01-preview",
         routing_mode: str = "quality"
     ):
         """
@@ -385,7 +385,7 @@ def get_foundry_service() -> Optional[FoundryService]:
 def init_foundry_service(
     endpoint: str,
     api_key: Optional[str] = None,
-    api_version: str = "2024-12-01-preview",
+    api_version: str = "2025-01-01-preview",
     routing_mode: str = "quality"
 ) -> FoundryService:
     """

@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     # =========================================================================
     foundry_endpoint: Optional[str] = None  # e.g., https://foundry-lorelantern.cognitiveservices.azure.com
     foundry_api_key: Optional[str] = None
-    foundry_api_version: str = "2024-12-01-preview"  # Model Router API version (official docs)
+    foundry_api_version: str = "2025-01-01-preview"  # Model Router API version (official docs)
     use_foundry: bool = False  # Feature flag - when True, use Foundry instead of direct APIs
 
     # Model Router routing mode: "quality", "cost", "balanced"
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # =========================================================================
 
     # LLM Configuration (legacy - kept for backward compatibility)
-    llm_model: str = "gemini-1.5-flash"
+    llm_model: str = "gemini-2.0-flash"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 2048
 
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     # CompanionAgent Configuration
     # The CompanionAgent is always available and never blocked by CrewAI
     # Uses Anthropic models exclusively (to avoid Gemini quota issues)
-    companion_fast_model: str = "claude-3-haiku-20240307"        # Fastest responses (~500ms-1s)
+    companion_fast_model: str = "claude-haiku-4-5-20251001"      # Fastest responses (~500ms-1s)
     companion_quality_model: str = "claude-sonnet-4-5-20250929"  # Rich character spotlights
     companion_proactive_interval: int = 30                      # Seconds between teasers
     companion_max_teasers: int = 4                              # Max teasers before Chapter 1
