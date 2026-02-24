@@ -187,18 +187,20 @@ class ModelValidator:
 
             # Fallback to known models if API fails
             return [
+                "gemini-3.1-pro-preview",
                 "gemini-3-pro-preview",
                 "gemini-3-flash-preview",
-                "gemini-2.0-flash",
+                "gemini-2.5-flash",
                 "gemini-1.5-pro",
                 "gemini-1.5-flash",
             ]
         except Exception as e:
             print(f"   Note: Could not fetch Google models list: {str(e)[:80]}")
             return [
+                "gemini-3.1-pro-preview",
                 "gemini-3-pro-preview",
                 "gemini-3-flash-preview",
-                "gemini-2.0-flash",
+                "gemini-2.5-flash",
                 "gemini-1.5-pro",
                 "gemini-1.5-flash",
             ]

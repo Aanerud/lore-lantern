@@ -46,14 +46,14 @@ class TestLLMRouterHierarchy:
 
         # Each agent has an explicit model in models.yaml
         expected = {
-            'structure': 'gemini-3-pro-preview',
+            'structure': 'gemini-3.1-pro-preview',
             'character': 'claude-opus-4-6',
             'factcheck': 'gpt-5.2',
-            'line_editor': 'claude-sonnet-4-5-20250929',
-            'continuity': 'claude-sonnet-4-5-20250929',
-            'tension': 'claude-sonnet-4-5-20250929',
+            'line_editor': 'claude-opus-4-6',
+            'continuity': 'claude-opus-4-6',
+            'tension': 'claude-opus-4-6',
             'narrative': 'claude-opus-4-6',
-            'dialogue': 'gpt-4o-mini',
+            'dialogue': 'gpt-5.2',
         }
         for agent, expected_model in expected.items():
             model = router.get_model_for_agent(agent)

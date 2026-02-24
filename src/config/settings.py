@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     # =========================================================================
 
     # LLM Configuration (legacy - kept for backward compatibility)
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0.7
     llm_max_tokens: int = 2048
 
